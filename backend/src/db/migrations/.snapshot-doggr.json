@@ -6,6 +6,34 @@
   "tables": [
     {
       "columns": {
+        "word": {
+          "name": "word",
+          "type": "varchar(255)",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "mappedType": "string"
+        }
+      },
+      "name": "bad_word",
+      "schema": "public",
+      "indexes": [
+        {
+          "keyName": "bad_word_pkey",
+          "columnNames": [
+            "word"
+          ],
+          "composite": false,
+          "primary": true,
+          "unique": true
+        }
+      ],
+      "checks": [],
+      "foreignKeys": {}
+    },
+    {
+      "columns": {
         "id": {
           "name": "id",
           "type": "serial",
