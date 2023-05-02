@@ -1,7 +1,8 @@
 import {FastifyInstance, FastifyReply, FastifyRequest} from "fastify";
 import { Match } from "./db/entities/Match.js";
 import {User} from "./db/entities/User.js";
-import {ICreateUsersBody} from "./types.js";
+import {ICreateUsersBody, messageAllDelete, messageCreate, messageDelete, messageUpdate} from "./types.js";
+import {Message} from "./db/entities/Message.js";
 
 async function DoggrRoutes(app: FastifyInstance, _options = {}) {
 	if (!app) {
@@ -87,6 +88,8 @@ async function DoggrRoutes(app: FastifyInstance, _options = {}) {
 		reply.send(userToChange);
 		
 	});
+
+
 	
 	// DELETE
 	app.delete<{ Body: {email}}>("/users", async(req, reply) => {
@@ -130,6 +133,150 @@ async function DoggrRoutes(app: FastifyInstance, _options = {}) {
 		}
 
 	});
+
+
+	// READ ALL MESSAGES RECEIVED
+	//
+	// 	{
+	// 		"receiver": "email@email.com"
+	// 	}
+
+	app.search<{ receiver: string }>("/messages", async (req, reply) => {
+		const {receiver}  = await req.body;
+
+		const theUser = await req.em.findOne(User, {email: receiver});
+		const email = theUser.email;
+
+		try {
+			const messages = await req.em.find(Message, {receiver: { email }});
+			console.log(messages);
+			reply.send(messages);
+		} catch (err) {
+			console.error(err);
+			reply.status(500).send(err);
+		}
+	});
+
+	// READ ALL MESSAGES SENT
+	// {
+	// 	"sender": "email@email.com"
+	// }
+
+	app.search<{ sender: string }>("/messages/sent", async (req, reply) => {
+		const {sender}  = await req.body;
+
+		const theUser = await req.em.findOne(User, {email: sender});
+		const email = theUser.email;
+
+		try {
+			const messages = await req.em.find(Message, {sender: { email }});
+			console.log(messages);
+			reply.send(messages);
+		} catch (err) {
+			console.error(err);
+			reply.status(500).send(err);
+		}
+	});
+
+
+
+	// CREATE A NEW MESSAGE
+	// {
+	// 	"sender": "email@email.com",
+	// 	"receiver": "email2@email.com",
+	// 	"message": "Hi"
+	// }
+
+	app.post<{Body: messageCreate}>("/messages", async (req, reply) => {
+		const { sender, receiver, message} = req.body;
+
+		try {
+			const theSender = await req.em.find(User, { email: sender });
+			const theReceiver = await req.em.find(User, { email: receiver });
+			const newMessage = new Message();
+			newMessage.sender = theSender[0];
+			newMessage.receiver = theReceiver[0];
+			newMessage.message = message;
+			await req.em.persistAndFlush(newMessage);
+
+			console.log("Created new message:", newMessage);
+			return reply.send(newMessage);
+		} catch (err) {
+			console.log("Failed to create new user", err.message);
+			return reply.status(500).send({message: err.message});
+		}
+	});
+
+
+	// UPDATE A MESSAGE
+	// {
+	// 	"messageId": "1",
+	// 	"message": "The new message text"
+	// }
+
+	app.put<{ Body: messageUpdate }>("/messages", async (req, reply) => {
+		const {messageId, message}  = await req.body;
+
+		try {
+			const theMessage = await req.em.findOne(Message, {messageId});
+			theMessage.message = message;
+			await req.em.persistAndFlush(theMessage);
+
+			console.log(theMessage);
+			reply.send(theMessage);
+		} catch (err) {
+			console.log("Message Does Not Exist:", err.message);
+			reply.status(500).send(err);
+		}
+	});
+
+
+	// DELETE a message
+	// {
+	// 	"messageId": "1"
+	// }
+
+	app.delete<{ Body: messageDelete }>("/messages", async (req, reply) => {
+		const {messageId}  = await req.body;
+
+		try {
+			const theMessage = await req.em.findOne(Message, {messageId});
+			await req.em.remove(theMessage).flush();
+
+			console.log("removed:");
+			console.log(theMessage);
+			reply.send(theMessage);
+		} catch (err) {
+			console.log("Message Does Not Exist:", err.message);
+			reply.status(500).send(err);
+		}
+	});
+
+
+	// DELETE ALL SENT MESSAGES
+	// {
+	// 	"sender": "email@email.com"
+	// }
+
+	app.delete<{ Body: { sender: string} }>("/messages/all", async (req, reply) => {
+		const {sender}  = await req.body;
+		const theUser = await req.em.findOne(User, {email: sender});
+		const email = theUser.email;
+
+		try {
+			await req.em.nativeDelete(Message, {sender: { email }})
+			await req.em.flush();
+
+			const messagesRemaining = await req.em.find(Message, {sender: { email }});
+			console.log(messagesRemaining);
+			reply.send("Messages Deleted Successfully. This is what remains: " + messagesRemaining);
+		} catch (err) {
+			console.error(err);
+			reply.status(500).send("No Messages Found" + err);
+		}
+	});
+
+
 }
 
 export default DoggrRoutes;
