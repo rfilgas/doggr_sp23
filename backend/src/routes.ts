@@ -1,8 +1,9 @@
 import {FastifyInstance, FastifyReply, FastifyRequest} from "fastify";
 import { Match } from "./db/entities/Match.js";
 import {User} from "./db/entities/User.js";
-import {ICreateUsersBody, messageAllDelete, messageCreate, messageDelete, messageUpdate} from "./types.js";
+import {ICreateUsersBody, messageCreate, messageDelete, messageDeleteAll, messageUpdate} from "./types.js";
 import {Message} from "./db/entities/Message.js";
+import {hasBadWord, passwordNotValid} from "./filters.js";
 
 async function DoggrRoutes(app: FastifyInstance, _options = {}) {
 	if (!app) {
@@ -89,8 +90,6 @@ async function DoggrRoutes(app: FastifyInstance, _options = {}) {
 		
 	});
 
-
-	
 	// DELETE
 	app.delete<{ Body: {email}}>("/users", async(req, reply) => {
 		const { email } = req.body;
@@ -179,7 +178,6 @@ async function DoggrRoutes(app: FastifyInstance, _options = {}) {
 	});
 
 
-
 	// CREATE A NEW MESSAGE
 	// {
 	// 	"sender": "email@email.com",
@@ -191,6 +189,13 @@ async function DoggrRoutes(app: FastifyInstance, _options = {}) {
 		const { sender, receiver, message} = req.body;
 
 		try {
+			const isBad= await hasBadWord(message, req);
+			if (isBad === true) {
+				const badWarning = "Bad words are prohibited.";
+				console.log(badWarning);
+				return reply.status(500).send({message: badWarning});
+			}
+
 			const theSender = await req.em.find(User, { email: sender });
 			const theReceiver = await req.em.find(User, { email: receiver });
 			const newMessage = new Message();
@@ -218,6 +223,15 @@ async function DoggrRoutes(app: FastifyInstance, _options = {}) {
 		const {messageId, message}  = await req.body;
 
 		try {
+
+			const isBad= await hasBadWord(message, req);
+			if (isBad === true) {
+				const badWarning = "Bad words are prohibited.";
+				console.log(badWarning);
+				return reply.status(500).send({message: badWarning});
+			}
+
+
 			const theMessage = await req.em.findOne(Message, {messageId});
 			theMessage.message = message;
 			await req.em.persistAndFlush(theMessage);
@@ -234,21 +248,26 @@ async function DoggrRoutes(app: FastifyInstance, _options = {}) {
 	// DELETE a message
 	// {
 	// 	"messageId": "1"
+	//	"password": "doggos"
 	// }
 
 	app.delete<{ Body: messageDelete }>("/messages", async (req, reply) => {
-		const {messageId}  = await req.body;
+		const {messageId, password}  = await req.body;
+
+		const passwordIsNotValid = passwordNotValid(password);
+		if (passwordIsNotValid){
+			reply.status(401).send("Incorrect Password");
+		}
 
 		try {
 			const theMessage = await req.em.findOne(Message, {messageId});
 			await req.em.remove(theMessage).flush();
-
-			console.log("removed:");
+			console.log("removed: ");
 			console.log(theMessage);
 			reply.send(theMessage);
 		} catch (err) {
 			console.log("Message Does Not Exist:", err.message);
-			reply.status(500).send(err);
+			reply.status(500).send("Message Not Found: " + err);
 		}
 	});
 
@@ -256,15 +275,22 @@ async function DoggrRoutes(app: FastifyInstance, _options = {}) {
 	// DELETE ALL SENT MESSAGES
 	// {
 	// 	"sender": "email@email.com"
+	//	"password": "doggos"
 	// }
 
-	app.delete<{ Body: { sender: string} }>("/messages/all", async (req, reply) => {
-		const {sender}  = await req.body;
+	app.delete<{ Body: messageDeleteAll }>("/messages/all", async (req, reply) => {
+		const {sender, password}  = await req.body;
+
+		const passwordIsNotValid = passwordNotValid(password);
+		if (passwordIsNotValid){
+			reply.status(401).send("Incorrect Password");
+		}
+
 		const theUser = await req.em.findOne(User, {email: sender});
 		const email = theUser.email;
 
 		try {
-			await req.em.nativeDelete(Message, {sender: { email }})
+			await req.em.nativeDelete(Message, {sender: { email }});
 			await req.em.flush();
 
 			const messagesRemaining = await req.em.find(Message, {sender: { email }});
@@ -275,7 +301,6 @@ async function DoggrRoutes(app: FastifyInstance, _options = {}) {
 			reply.status(500).send("No Messages Found" + err);
 		}
 	});
-
 
 }
 

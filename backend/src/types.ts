@@ -16,9 +16,11 @@ export type messageUpdate = {
 }
 
 export type messageDelete = {
-	messageId: number
+	messageId: number,
+	password: string
 }
 
-export type messageAllDelete = {
-	sender: string
+export type messageDeleteAll = {
+	sender: string,
+	password: string
 }

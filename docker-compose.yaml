@@ -32,6 +32,7 @@ services:
       - DB_PASS=doggr
       - PORT=8080
       - HOST=0.0.0.0
+      - ADMIN_PASS=1997
     depends_on:
       postgres:
         condition: service_healthy
