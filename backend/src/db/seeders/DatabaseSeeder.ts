@@ -2,6 +2,7 @@ import type { EntityManager } from '@mikro-orm/core';
 import { Seeder } from '@mikro-orm/seeder';
 import {UserSeeder} from "./UserSeeder.js";
 import {MessageSeeder} from "./MessageSeeder.js";
+import {BadWordSeeder} from "./BadWordSeeder.js";
 
 export class DatabaseSeeder extends Seeder {
 
@@ -9,7 +10,7 @@ export class DatabaseSeeder extends Seeder {
 		return this.call(em, [
 			// UserSeeder,
 			// MessageSeeder
-			//
+			BadWordSeeder
 		]);
 	}
 
